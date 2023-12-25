@@ -1,0 +1,57 @@
+image: alpine:latest
+
+environments:
+  preprod:
+    MY_LOGIN: my_preprod_login
+    MY_PASSWORD: my_preprod_password
+  production:
+    MY_LOGIN: my_production_login
+    MY_PASSWORD: my_production_password
+
+variables:
+  MY_LOGIN:
+    preprod: my_preprod_login
+    production: my_production_login
+
+scripts:
+  stop_all_pipelines:
+    script: |
+      set -euxo pipefail
+
+      # Get the current branch name
+      branch=$(git rev-parse --abbrev-ref HEAD)
+
+      # Get all pipelines for the current branch
+      pipelines=$(gitlab-ci-multi-runner exec --limit 1 --with-token $CI_JOB_TOKEN --list-pipelines --ref $branch)
+
+      # Stop all pipelines
+      for pipeline in $pipelines; do
+        gitlab-ci-multi-runner exec --limit 1 --with-token $CI_JOB_TOKEN --stop-pipeline $pipeline
+      done
+
+jobs:
+  build:
+    stage: build
+    script:
+      - echo "Building"
+      - docker build -t my-app:latest .
+
+  deploy_preprod:
+    stage: deploy
+    environment: preprod
+    script:
+      - echo "Deploying to preprod"
+      - docker push my-app:latest
+      - ssh my-preprod-server "docker pull my-app:latest && docker run -d -p 8080:80 my-app:latest"
+
+  deploy_production:
+    stage: deploy
+    environment: production
+    script:
+      - echo "Deploying to production"
+      - docker push my-app:latest
+      - ssh my-production-server "docker pull my-app:latest && docker run -d -p 80:80 my-app:latest"
+
+  stop_all_pipelines:
+    stage: stop
+    script: stop_all_pipelines
