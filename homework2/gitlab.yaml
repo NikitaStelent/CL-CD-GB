@@ -1,0 +1,24 @@
+stages:
+  - build
+  - test
+
+before_script:
+  - echo "Hello"
+
+job A:
+  stage: build
+  script:
+    - mkdir vendor/
+    - echo "build" > vendor/hello.txt
+  cache:
+    key: build-cache
+    paths:
+      - vendor/
+  after_script:
+    - echo "World"
+
+job B:
+  stage: test
+  image: docker:latest
+  script:
+    - docker run hello-world
